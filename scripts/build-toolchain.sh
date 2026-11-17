@@ -12,6 +12,7 @@ SYSROOT="$DISTRO/sysroot"
 
 TARGET="${TARGET:-x86_64-unknown-linux-gnu}"
 JOBS="${JOBS:-$(nproc)}"
+GLIBC_JOBS="${GLIBC_JOBS:-1}"
 LINUX_VERSION="7.3.4"
 
 export PATH="$TOOLS/bin:$PATH"
@@ -129,9 +130,9 @@ RANLIB="$TARGET-ranlib" \
     --disable-nscd \
     libc_cv_slibdir=/usr/lib
 
-run_make
+make -j"$GLIBC_JOBS" CXX=
 
-make DESTDIR="$SYSROOT" install
+make DESTDIR="$SYSROOT" install CXX=
 
 mkdir -p "$BUILD/gcc-pass2"
 cd "$BUILD/gcc-pass2"
