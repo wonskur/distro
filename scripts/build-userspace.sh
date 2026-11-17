@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
@@ -177,8 +176,6 @@ build_bzip2() {
         install
 }
 
-# Build libraries
-
 build_zlib
 
 build_autotools "expat-2.10.0.tar.xz" \
@@ -207,8 +204,6 @@ build_autotools "readline-8.3.tar.gz"
 
 build_openssl
 
-# GNU Base Utilities
-
 build_autotools "m4-1.4.21.tar.xz"
 
 build_autotools "bash-5.3.tar.gz" \
@@ -236,8 +231,6 @@ build_bzip2
 build_autotools "xz-5.8.4.tar.xz" \
     --disable-static
 
-# Additional tools
-
 build_autotools "make-4.4.1.tar.gz"
 
 build_autotools "patch-2.8.1.tar.xz"
@@ -247,8 +240,6 @@ build_autotools "file-5.48.tar.gz"
 build_autotools "less-710.tar.gz"
 
 build_autotools "gettext-1.0.tar.xz"
-
-# Compression
 
 build_cmake "zstd-1.5.7.tar.gz" \
     -DZSTD_BUILD_PROGRAMS=ON \

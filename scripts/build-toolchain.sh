@@ -20,36 +20,31 @@ export CONFIG_SITE=/dev/null
 
 mkdir -p "$SOURCES" "$BUILD" "$TOOLS" "$SYSROOT"
 
-BUILD_TRIPLET="$("$SOURCES/binutils-2.47/config.guess" 2>/dev/null || true)"
-
-if [[ -z "$BUILD_TRIPLET" ]]; then
-    BUILD_TRIPLET="$(gcc -dumpmachine)"
-fi
-
 get_source() {
-    local name="$1"
-    local archive="$SOURCES/$name"
-
-    if [[ -d "$SOURCES/$name" ]]; then
-        echo "$SOURCES/$name"
-        return
-    fi
+    local archive="$SOURCES/$1"
 
     if [[ ! -f "$archive" ]]; then
         echo "Missing source archive: $archive" >&2
         exit 1
     fi
 
-    tar -xf "$archive" -C "$SOURCES"
-    echo "$SOURCES/$(basename "$archive" | sed 's/\.tar\..*$//')"
+    local dir
+    dir="$(basename "$archive" | sed 's/\.tar\..*$//')"
+
+    if [[ ! -d "$SOURCES/$dir" ]]; then
+        tar -xf "$archive" -C "$SOURCES"
+    fi
+
+    echo "$SOURCES/$dir"
 }
 
 run_make() {
     make -j"$JOBS" "$@"
 }
 
-# Binutils Pass 1
 BINUTILS="$(get_source binutils-2.47.tar.xz)"
+
+BUILD_TRIPLET="$("$BINUTILS/config.guess" 2>/dev/null || gcc -dumpmachine)"
 
 mkdir -p "$BUILD/binutils-pass1"
 cd "$BUILD/binutils-pass1"
@@ -65,7 +60,6 @@ cd "$BUILD/binutils-pass1"
 run_make
 make install
 
-# GCC Pass 1
 GCC="$(get_source gcc-16.2.0.tar.xz)"
 
 GMP="$(get_source gmp-6.3.0.tar.xz)"
@@ -105,7 +99,6 @@ run_make all-target-libgcc
 make install-gcc
 make install-target-libgcc
 
-# Linux API Headers
 LINUX="$(get_source "linux-$LINUX_VERSION.tar.xz")"
 
 cd "$LINUX"
@@ -117,7 +110,6 @@ make ARCH=x86 \
     INSTALL_HDR_PATH="$SYSROOT/usr" \
     headers_install
 
-# Glibc
 GLIBC="$(get_source glibc-2.44.tar.xz)"
 
 mkdir -p "$BUILD/glibc"
@@ -141,7 +133,6 @@ run_make
 
 make DESTDIR="$SYSROOT" install
 
-# GCC Pass 2
 mkdir -p "$BUILD/gcc-pass2"
 cd "$BUILD/gcc-pass2"
 
@@ -166,9 +157,7 @@ run_make all-target-libgcc
 make install-gcc
 make install-target-libgcc
 
-# Libstdc++
 run_make -C "$BUILD/gcc-pass2" all-target-libstdc++-v3
 make -C "$BUILD/gcc-pass2" install-target-libstdc++-v3
 
-# Validation
 "$TOOLS/bin/$TARGET-gcc" --version

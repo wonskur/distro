@@ -76,23 +76,40 @@ build_autotools() {
     make -j"$JOBS"
     make DESTDIR="$SYSROOT" install
 }
-# System libraries and tools
+
+build_libcap() {
+    local src
+    src="$(get_source libcap-2.78.tar.xz)"
+
+    cd "$src"
+
+    make -j"$JOBS" \
+        prefix=/usr \
+        lib=lib \
+        CC="$CC" \
+        AR="$AR" \
+        RANLIB="$RANLIB"
+
+    make \
+        prefix=/usr \
+        lib=lib \
+        DESTDIR="$SYSROOT" \
+        install
+}
+
 echo "Building system utilities"
 
-build_autotools "libcap2-2.78.tar.xz" \
-    --with-cap=linux
+build_libcap
 
 build_autotools "attr-2.6.0.tar.gz"
 
 build_autotools "acl-2.4.0.tar.xz"
 
 build_autotools "libpipeline-1.5.8.tar.gz"
-# Process management
 
 build_autotools "procps-ng-4.0.7.tar.xz" \
     --disable-kill
 
-# System management
 build_autotools "kmod-34.3.tar.xz" \
     --with-zlib \
     --with-xz \
@@ -103,12 +120,23 @@ build_autotools "shadow-4.20.3.tar.xz" \
     --with-group-name-max-length=32
 
 build_autotools "psmisc-23.7.tar.xz"
-# Filesystems
+
 build_autotools "e2fsprogs-1.47.4.tar.gz" \
     --enable-elf-shlibs \
     --disable-fsck
 
-# Networking
+build_autotools "util-linux-2.42.4.tar.xz" \
+    --disable-chfn-chsh \
+    --disable-login \
+    --disable-nologin \
+    --disable-su \
+    --disable-setpriv \
+    --disable-runuser \
+    --disable-pylibmount \
+    --without-python \
+    --without-systemd \
+    --without-systemdsystemunitdir
+
 build_autotools "inetutils-2.8.tar.gz" \
     --disable-logger \
     --disable-whois \
@@ -139,7 +167,6 @@ make \
     LIBDIR=/usr/lib \
     install
 
-# System database
 echo
 echo "Installing iana-etc"
 
@@ -151,7 +178,6 @@ make -j"$JOBS"
 
 make DESTDIR="$SYSROOT" install
 
-# System documentation
 MANPAGES="$(get_source man-pages-6.20.tar.xz)"
 
 cd "$MANPAGES"
@@ -161,13 +187,11 @@ make -j"$JOBS" \
     DESTDIR="$SYSROOT" \
     install
 
-# Documentation tools
 build_autotools "texinfo-7.3.tar.xz"
 
 build_autotools "man-db-2.13.1.tar.xz" \
     --disable-setuid
 
-# Vim
 VIM="$(get_source vim-9.2.1225.tar.gz)"
 
 cd "$VIM/src"
@@ -186,7 +210,6 @@ make -j"$JOBS" \
 
 make DESTDIR="$SYSROOT" install
 
-# GRUB
 GRUB="$(get_source grub-2.16.tar.xz)"
 
 mkdir -p "$BUILD/utilities/grub"
