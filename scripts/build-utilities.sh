@@ -48,6 +48,13 @@ get_source() {
     echo "$SOURCES/$dir"
 }
 
+fix_la_paths() {
+    local la
+    while IFS= read -r -d '' la; do
+        sed -i -E 's#/usr/lib/lib([^[:space:]]+)\.la#-l\1#g' "$la"
+    done < <(find "$SYSROOT" -name '*.la' -print0 2>/dev/null)
+}
+
 build_autotools() {
     local archive="$1"
     shift
@@ -74,7 +81,12 @@ build_autotools() {
         "$@"
 
     make -j"$JOBS"
-    make DESTDIR="$SYSROOT" install
+    if command -v fakeroot >/dev/null 2>&1; then
+        fakeroot make DESTDIR="$SYSROOT" install
+    else
+        make DESTDIR="$SYSROOT" install
+    fi
+    fix_la_paths
 }
 
 build_libcap() {
@@ -113,19 +125,20 @@ build_autotools "procps-ng-4.0.7.tar.xz" \
 build_autotools "kmod-34.3.tar.xz" \
     --with-zlib \
     --with-xz \
-    --with-zstd
+    --with-zstd \
+    --disable-manpages
 
 build_autotools "shadow-4.20.3.tar.xz" \
     --sysconfdir=/etc \
-    --with-group-name-max-length=32
+    --with-group-name-max-length=32 \
+    --disable-logind
 
 build_autotools "psmisc-23.7.tar.xz"
 
-build_autotools "e2fsprogs-1.47.4.tar.gz" \
-    --enable-elf-shlibs \
-    --disable-fsck
+build_autotools "psmisc-23.7.tar.xz"
 
 build_autotools "util-linux-2.42.4.tar.xz" \
+    --libdir=/usr/lib \
     --disable-chfn-chsh \
     --disable-login \
     --disable-nologin \
@@ -137,7 +150,14 @@ build_autotools "util-linux-2.42.4.tar.xz" \
     --without-systemd \
     --without-systemdsystemunitdir
 
+build_autotools "e2fsprogs-1.47.4.tar.gz" \
+    --enable-elf-shlibs \
+    --disable-fsck \
+    --disable-libblkid \
+    --disable-libuuid
+
 build_autotools "inetutils-2.8.tar.gz" \
+    --with-path-procnet-dev=/proc/net/dev \
     --disable-logger \
     --disable-whois \
     --disable-rcp \
@@ -174,29 +194,31 @@ IANA="$(get_source iana-etc-20261015.tar.gz)"
 
 cd "$IANA"
 
-make -j"$JOBS"
-
-make DESTDIR="$SYSROOT" install
+install -D -m 0644 protocols "$SYSROOT/etc/protocols"
+install -D -m 0644 services "$SYSROOT/etc/services"
 
 MANPAGES="$(get_source man-pages-6.20.tar.xz)"
 
-cd "$MANPAGES"
-
-make -j"$JOBS" \
-    prefix=/usr \
-    DESTDIR="$SYSROOT" \
-    install
+for dir in "$MANPAGES"/man[0-9]*; do
+    name="$(basename "$dir")"
+    install -d "$SYSROOT/usr/share/man/$name"
+    for page in "$dir"/*; do
+        install -m 0644 "$page" "$SYSROOT/usr/share/man/$name/"
+    done
+done
 
 build_autotools "texinfo-7.3.tar.xz"
 
 build_autotools "man-db-2.13.1.tar.xz" \
-    --disable-setuid
+    --disable-setuid \
+    --disable-manual
 
 VIM="$(get_source vim-9.2.1225.tar.gz)"
 
 cd "$VIM/src"
 
 ./configure \
+    --build="$(gcc -dumpmachine)" \
     --host="$TARGET" \
     --prefix=/usr \
     --with-features=huge \

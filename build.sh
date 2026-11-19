@@ -14,6 +14,10 @@ if ! id "$BUILDER" &>/dev/null; then
     useradd -m -s /bin/bash "$BUILDER"
 fi
 
+if getent group tty >/dev/null && ! id -nG "$BUILDER" | tr ' ' '\n' | grep -qx tty; then
+    usermod -aG tty "$BUILDER"
+fi
+
 BUILDER_HOME="$(getent passwd "$BUILDER" | cut -d: -f6)"
 DISTRO="$BUILDER_HOME/distro"
 LOGS="$DISTRO/logs"

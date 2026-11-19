@@ -49,6 +49,13 @@ get_source() {
     echo "$SOURCES/$dir"
 }
 
+fix_la_paths() {
+    local la
+    while IFS= read -r -d '' la; do
+        sed -i -E 's#/usr/lib/lib([^[:space:]]+)\.la#-l\1#g' "$la"
+    done < <(find "$SYSROOT" -name '*.la' -print0 2>/dev/null)
+}
+
 build_autotools() {
     local archive="$1"
     shift
@@ -75,7 +82,12 @@ build_autotools() {
         "$@"
 
     make -j"$JOBS"
-    make DESTDIR="$SYSROOT" install
+    if command -v fakeroot >/dev/null 2>&1; then
+        fakeroot make DESTDIR="$SYSROOT" install
+    else
+        make DESTDIR="$SYSROOT" install
+    fi
+    fix_la_paths
 }
 
 build_cmake() {
@@ -125,6 +137,7 @@ build_cmake() {
 
     cmake --build "$build" --parallel "$JOBS"
     DESTDIR="$SYSROOT" cmake --install "$build"
+    fix_la_paths
 }
 
 build_zlib() {
@@ -227,6 +240,18 @@ build_autotools "expat-2.10.0.tar.xz" \
 
 build_autotools "libffi-3.8.0.tar.gz"
 
+build_autotools "gdbm-1.26.tar.gz" \
+    --disable-static \
+    --enable-libgdbm-compat
+
+build_autotools "libmd-1.1.0.tar.xz" \
+    --disable-static
+
+build_autotools "libbsd-0.12.2.tar.xz" \
+    --disable-static
+
+sed -i 's| /usr/lib/libmd.la| -lmd|' "$SYSROOT/usr/lib/libbsd.la"
+
 build_autotools "libxcrypt-4.5.2.tar.xz" \
     --enable-hashes=strong,glibc \
     --enable-obsolete-api=no \
@@ -242,10 +267,17 @@ build_autotools "ncurses-6.6.tar.gz" \
     --without-debug \
     --without-ada \
     --enable-widec \
+    --enable-pc-files \
     --with-build-cc=gcc \
     --with-pkg-config-libdir=/usr/lib/pkgconfig
 
 build_autotools "readline-8.3.tar.gz"
+
+for lib in tinfo ncurses; do
+    if [[ -e "$SYSROOT/usr/lib/lib${lib}w.so" ]]; then
+        ln -sfn "lib${lib}w.so" "$SYSROOT/usr/lib/lib${lib}.so"
+    fi
+done
 
 build_openssl
 
