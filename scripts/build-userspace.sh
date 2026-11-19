@@ -147,7 +147,6 @@ build_openssl() {
     cd "$src"
 
     CC="$CC" ./Configure linux-x86_64 \
-        --cross-compile-prefix="$TARGET-" \
         --prefix=/usr \
         --openssldir=/etc/ssl \
         --libdir=lib \
@@ -168,12 +167,57 @@ build_bzip2() {
         AR="$AR" \
         RANLIB="$RANLIB"
 
+    rm -f blocksort.o huffman.o crctable.o randtable.o compress.o decompress.o bzlib.o
+
+    make -f Makefile-libbz2_so \
+        CC="$CC" \
+        AR="$AR" \
+        RANLIB="$RANLIB"
+
     make \
         CC="$CC" \
         AR="$AR" \
         RANLIB="$RANLIB" \
         PREFIX="$SYSROOT/usr" \
         install
+
+    install -D -m 0755 libbz2.so.1.0.8 "$SYSROOT/usr/lib/libbz2.so.1.0.8"
+    ln -sfn libbz2.so.1.0.8 "$SYSROOT/usr/lib/libbz2.so.1.0"
+    ln -sfn libbz2.so.1.0 "$SYSROOT/usr/lib/libbz2.so.1"
+    ln -sfn libbz2.so.1.0.8 "$SYSROOT/usr/lib/libbz2.so"
+}
+
+build_file() {
+    local src name native build
+    src="$(get_source "file-5.48.tar.gz")"
+    name="$(basename "$src")"
+    native="$BUILD/userspace/$name-native"
+    build="$BUILD/userspace/$name"
+
+    rm -rf "$native" "$build"
+    mkdir -p "$native" "$build"
+
+    cd "$native"
+    CC=gcc CXX=g++ AR=ar RANLIB=ranlib AS=as LD=ld STRIP=strip \
+        "$src/configure" \
+            --build="$(gcc -dumpmachine)" \
+            --disable-nls \
+            --disable-bzlib \
+            --disable-xzlib \
+            --disable-zlib \
+            --disable-libseccomp
+    make -j"$JOBS" CC=gcc CXX=g++ AR=ar RANLIB=ranlib AS=as LD=ld STRIP=strip
+
+    cd "$build"
+    "$src/configure" \
+        --build="$(gcc -dumpmachine)" \
+        --host="$TARGET" \
+        --prefix=/usr \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --disable-nls
+    make -j"$JOBS" FILE_COMPILE="$native/src/file"
+    make DESTDIR="$SYSROOT" install
 }
 
 build_zlib
@@ -185,7 +229,8 @@ build_autotools "libffi-3.8.0.tar.gz"
 
 build_autotools "libxcrypt-4.5.2.tar.xz" \
     --enable-hashes=strong,glibc \
-    --enable-obsolete-api=no
+    --enable-obsolete-api=no \
+    --disable-werror
 
 build_autotools "pcre2-10.49.tar.bz2" \
     --enable-unicode \
@@ -220,7 +265,18 @@ build_autotools "sed-4.10.tar.xz"
 
 build_autotools "gawk-5.4.1.tar.xz"
 
-build_autotools "diffutils-3.12.tar.xz"
+build_autotools "diffutils-3.12.tar.xz" \
+    gl_cv_func_strcasecmp_works=yes
+
+TAR_SRC="$(get_source "tar-1.35.tar.xz")"
+
+if grep -q '^static acl_t acl_get_file_at' "$TAR_SRC/src/xattrs.c"; then
+    sed -i \
+        -e 's/\bacl_get_file_at\b/tar_acl_get_file_at/g' \
+        -e 's/\bacl_set_file_at\b/tar_acl_set_file_at/g' \
+        -e 's/\bacl_delete_def_file_at\b/tar_acl_delete_def_file_at/g' \
+        "$TAR_SRC/src/xattrs.c"
+fi
 
 build_autotools "tar-1.35.tar.xz"
 
@@ -235,7 +291,7 @@ build_autotools "make-4.4.1.tar.gz"
 
 build_autotools "patch-2.8.1.tar.xz"
 
-build_autotools "file-5.48.tar.gz"
+build_file
 
 build_autotools "less-710.tar.gz"
 
@@ -244,7 +300,7 @@ build_autotools "gettext-1.0.tar.xz"
 build_cmake "zstd-1.5.7.tar.gz" \
     -DZSTD_BUILD_PROGRAMS=ON \
     -DZSTD_BUILD_SHARED=ON \
-    -DZSTD_BUILD_STATIC=OFF \
+    -DZSTD_BUILD_STATIC=ON \
     -DZSTD_BUILD_TESTS=OFF
 
 build_cmake "lz4-1.10.0.tar.gz" \

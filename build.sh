@@ -27,6 +27,11 @@ export BUILD="$DISTRO/build"
 export TOOLS="$DISTRO/tools"
 export SYSROOT="$DISTRO/sysroot"
 export GLIBC_JOBS="${GLIBC_JOBS:-1}"
+export ROOTFS="${ROOTFS:-$DISTRO/rootfs}"
+export INITRAMFS="${INITRAMFS:-$DISTRO/initramfs}"
+export IMAGES="${IMAGES:-$DISTRO/images}"
+export ROOT_DEV="${ROOT_DEV:-/dev/vda}"
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 source "$SCRIPT_DIR/config/packages.sh"
 
@@ -113,21 +118,37 @@ show_log_tail() {
     echo "--- end of tail ---" >&2
 }
 
+run_step_command() {
+    local user="$1"
+    local script="$2"
+
+    if [[ "$user" == "root" ]]; then
+        bash "$script"
+    else
+        runuser -u "$user" -- \
+            env DISTRO="$DISTRO" \
+                SOURCES="$SOURCES" \
+                BUILD="$BUILD" \
+                TOOLS="$TOOLS" \
+                SYSROOT="$SYSROOT" \
+                GLIBC_JOBS="$GLIBC_JOBS" \
+                ROOTFS="$ROOTFS" \
+                INITRAMFS="$INITRAMFS" \
+                IMAGES="$IMAGES" \
+                ROOT_DEV="$ROOT_DEV" \
+                bash "$script"
+    fi
+}
+
 run_step() {
     local script="$1"
+    local user="${2:-$BUILDER}"
     local step="${script%.sh}"
     local log="$LOGS/$step.log"
     local rc=0
 
-    echo "==> Running $script (log: $log)"
-    if runuser -u "$BUILDER" -- \
-        env DISTRO="$DISTRO" \
-            SOURCES="$SOURCES" \
-            BUILD="$BUILD" \
-            TOOLS="$TOOLS" \
-            SYSROOT="$SYSROOT" \
-            GLIBC_JOBS="$GLIBC_JOBS" \
-            bash "$SCRIPT_DIR/scripts/$script" 2>&1 | tee "$log"; then
+    echo "==> Running $script as $user (log: $log)"
+    if run_step_command "$user" "$SCRIPT_DIR/scripts/$script" 2>&1 | tee "$log"; then
         SUCCESS_STEPS+=("$step")
         echo "==> $step completed"
     else
@@ -148,6 +169,9 @@ run_step "build-toolchain.sh"
 run_step "build-kernel.sh"
 run_step "build-userspace.sh"
 run_step "build-utilities.sh"
+run_step "build-rootfs.sh" root
+run_step "build-initramfs.sh" root
+run_step "make-image.sh" root
 
 declare -A PROBLEM_PACKAGES=()
 

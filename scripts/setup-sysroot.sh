@@ -73,6 +73,6 @@ echo "distro" > "$SYSROOT/etc/hostname"
 
 cat > "$SYSROOT/etc/os-release" << 'EOF'
 NAME="distro"
-PRETTY_NAME="distro GNU/Linux"
+PRETTY_NAME="distro"
 ID=distro
 EOF

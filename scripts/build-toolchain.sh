@@ -158,6 +158,9 @@ run_make all-target-libgcc
 make install-gcc
 make install-target-libgcc
 
+run_make -C "$BUILD/gcc-pass2" all-target-libatomic
+make -C "$BUILD/gcc-pass2" install-target-libatomic
+
 run_make -C "$BUILD/gcc-pass2" all-target-libstdc++-v3
 make -C "$BUILD/gcc-pass2" install-target-libstdc++-v3
 
