@@ -176,6 +176,7 @@ run_step "build-utilities.sh"
 run_step "build-rootfs.sh" root
 run_step "build-initramfs.sh" root
 run_step "make-image.sh" root
+run_step "make-iso.sh" root
 
 declare -A PROBLEM_PACKAGES=()
 
