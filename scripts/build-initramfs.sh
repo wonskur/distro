@@ -16,6 +16,8 @@ fi
 
 rm -rf "$INITRAMFS"
 mkdir -p "$INITRAMFS"/{bin,sbin,etc,proc,sys,dev,run,tmp,newroot,usr/lib}
+ln -sfn usr/lib "$INITRAMFS/lib"
+ln -sfn usr/lib "$INITRAMFS/lib64"
 chmod 1777 "$INITRAMFS/tmp"
 mkdir -p "$IMAGES"
 
@@ -92,7 +94,7 @@ copy_binary() {
 
     install -D -m 0755 "$src" "$INITRAMFS$dest"
 
-    interpreter="$(readelf -l "$src" 2>/dev/null | awk -F': ' '/interpreter/ {print $2; exit}')"
+    interpreter="$(readelf -l "$src" 2>/dev/null | sed -n 's/.*interpreter: \(.*\)]/\1/p' | head -n 1)"
     if [[ -n "$interpreter" ]]; then
         copy_absolute "$interpreter"
     fi
